@@ -10,5 +10,5 @@ RUN jupyter serverextension enable --py --sys-prefix appmode
 RUN jupyter nbextension install --py --sys-prefix bqplot
 RUN jupyter nbextension enable --py --sys-prefix bqplot
 
-RUN git clone -b polynomial --single-branch --recursive https://github.com/PierreMarion23/latbuilder
+RUN git clone -b release --single-branch --recursive https://github.com/PierreMarion23/latbuilder
 RUN cd $HOME/latbuilder && ls && ./waf configure --prefix $HOME/latsoft --boost $HOME/dependencies --fftw $HOME/dependencies --ntl $HOME/dependencies && ./waf build && ./waf install

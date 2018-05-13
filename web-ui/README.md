@@ -8,7 +8,7 @@ It allows to easily run Lattice Builder without having to manually construct the
 
 ### Run online (no installation needed)
 
-Click here: [![Binder](https://mybinder.org/badge.svg)](https://mybinder.org/v2/gh/PierreMarion23/latbuilder/polynomial?urlpath=/apps/latbuilder/web-ui/Interface.ipynb)
+Click here: [![Binder](https://mybinder.org/badge.svg)](https://mybinder.org/v2/gh/PierreMarion23/latbuilder/release?urlpath=/apps/latsoft/bin/Interface.ipynb)
 
 A server is launched on [Binder](https://mybinder.org/), to run the Lattice Builder application.
 
