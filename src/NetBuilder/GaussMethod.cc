@@ -21,7 +21,7 @@
 
 namespace NetBuilder {
 
-void first_pivot(GeneratingMatrix& M, GeneratingMatrix& D, std::vector<int>& C, bool verbose=false){
+void first_pivot(GeneratingMatrix& M, GeneratingMatrix& D, std::vector<int>& C, int verbose= 0){
     int k = M.nRows();
     int m = M.nCols();
     
@@ -181,8 +181,8 @@ void add_line(GeneratingMatrix& T, GeneratingMatrix& D, std::map<int, int>& Orig
 }
 
 int iteration_on_k(std::vector<GeneratingMatrix>& Origin_Mats, int k, bool verbose=false){
-    int s = Origin_Mats.size();
-    int m = Origin_Mats[0].nCols();
+    int s = (int) Origin_Mats.size();
+    int m = (int) Origin_Mats[0].nCols();
 
     std::vector<std::vector<int>> lines_order = compositions(k, s);
     
@@ -258,10 +258,10 @@ int iteration_on_k(std::vector<GeneratingMatrix>& Origin_Mats, int k, bool verbo
     return 0;
 }
 
-int GaussMethod::computeTValue(std::vector<GeneratingMatrix> Origin_Mats, int maxSubProj, bool verbose=false)
+int GaussMethod::computeTValue(std::vector<GeneratingMatrix> Origin_Mats, int maxSubProj, int verbose=0)
 {
-    int m = Origin_Mats[0].nRows();
-    int s = Origin_Mats.size();
+    int m = (int) Origin_Mats[0].nRows();
+    int s = (int) Origin_Mats.size();
     if (s == 1){    // to be modified!
         return 0;
     }

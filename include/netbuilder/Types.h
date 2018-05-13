@@ -25,7 +25,7 @@
 #include <cstdint>
 #include <boost/numeric/ublas/vector.hpp>
 #include <functional>
-
+#include <NTL/GF2X.h>
 #include "latbuilder/Types.h"
 
 
@@ -43,7 +43,6 @@ typedef unsigned long uInteger;
 typedef double Real;
 
 /// Vector of floating-point values.
-// typedef std::vector<double> RealVector;
 typedef boost::numeric::ublas::vector<Real> RealVector;
 
 /// Merit value type.
@@ -59,15 +58,18 @@ typedef size_t size_type;
 using PointSetType = LatBuilder::PointSetType;
 
 /// Net construction methods
-enum class NetConstruction {
-    // SOBOL, POLYNOMIAL};
-    SOBOL};
+enum class NetConstruction {SOBOL, POLYNOMIAL, EXPLICIT};
 
 /// Binary real operator type
 typedef std::function<MeritValue (MeritValue, MeritValue)> BinOp;
 
 // Level combiner for embedded nets
 typedef std::function<Real (const RealVector&)> Combiner;
+
+/// polynomial over Z/2Z type 
+typedef NTL::GF2X Polynomial;
+
+enum class OutputFormat { GUI, CLI};
 
 //@}
 }

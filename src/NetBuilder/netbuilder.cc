@@ -20,6 +20,7 @@
 #include <boost/program_options.hpp>
 #include <iostream>
 
+#include <netbuilder/Types.h>
 #include <netbuilder/Parser/CommandLine.h>
 #include <netbuilder/Parser/PointSetTypeParser.h>
 #include <netbuilder/Parser/NetConstructionParser.h>
@@ -34,12 +35,12 @@
 namespace NetBuilder{
 static unsigned int merit_digits_displayed = 0; 
 
-void TaskOutput(const NetBuilder::Task::BaseTask& task)
+void TaskOutput(const NetBuilder::Task::BaseTask& task, NetBuilder::OutputFormat outputFormat = OutputFormat::CLI)
    {
-   unsigned int old_precision = std::cout.precision();
+   unsigned int old_precision = (unsigned int) std::cout.precision();
    if (merit_digits_displayed)
       std::cout.precision(merit_digits_displayed);
-   std::cout << "==> " << task.netOutput() << ": " << task.meritValueOutput() << std::endl;
+   std::cout << task.outputNet(outputFormat) << "merit: " << task.outputMeritValue() << std::endl;
    if (merit_digits_displayed)
       std::cout.precision(old_precision);
    }
@@ -57,11 +58,13 @@ makeOptionsDescription()
     "  net\n")
    ("help,h", "produce help message")
    ("version,V", "show version")
-   ("quiet,q", "show compact output (single line with number of points, generating vector and merit value)")
+   ("verbose,v", po::value<std::string>()->default_value("0"),
+   "specify the verbosity of the program\n")
    ("construction,c", po::value<std::string>()->default_value("sobol"),
    "digital-net; possible constructions:\n"
    "  sobol (default)\n"
-   "  polynomial\n")
+   "  polynomial:<modulus>\n"
+   "  explicit:<matrix-size>\n")
    ("set-type,t", po::value<std::string>()->default_value("net"),
     "type of point set; possible values:\n"
    "  net (default)\n"
@@ -72,7 +75,7 @@ makeOptionsDescription()
    "  2^<max-power>\n")
    ("exploration-method,e", po::value<std::string>(),
     "(required) exploration method; possible values:\n"
-    "  explicit:<net_description>\n" 
+    "  evaluation:<net_description>\n" 
     "  exhaustive\n"
     "  random:<r>\n"
     "  full-CBC\n"
@@ -106,7 +109,8 @@ makeOptionsDescription()
     "combiner for (filtered) multilevel merit values; possible values:\n"
     "  sum\n"
     "  max\n"
-    "  level:{<level>|max}\n")
+    "  level:{<level>|max}\n"
+    "  JoeKuoD6\n")
     ("figure-combiner,f", po::value<std::string>()->default_value("max"),
     "combiner for combined figure of merit; possible values: \n"
     "  sum\n"
@@ -114,7 +118,7 @@ makeOptionsDescription()
     ("add-figure,a", po::value< std::vector<std::string> >()->composing(),
     "(at least one required) add one type of figure of merits. If several, specify a figure combiner.\n"
     "Syntax pattern:\n"
-    "name=<name>| importance=<importance> | norm-type=<norm-type> | weights=<weights-description> | weight-power=<weight-power> \n"
+    "name=<name>/ importance=<importance> / norm-type=<norm-type> / weights=<weights-description> / weight-power=<weight-power> \n"
     "where name can take the following values:\n"
     "resolution-gap, t-value, A-Property, A'-Property and \n"
     "P<alpha> with the optional \"CU:\" prefix to switch to the coordinate-uniform evaluation algorithm\n")
@@ -128,6 +132,7 @@ makeOptionsDescription()
   //   "  low-pass:<threshold>\n"
   //   "where <multilevel-weights> specifies the per-level weights; possible values:\n"
   //   "  even[:<min-level>[:<max-level>]] (default)\n")
+   ("GUI,g","(optional) output format for the GUI")
    ("repeat,r", po::value<unsigned int>()->default_value(1),
     "(optional) number of times the construction must be executed\n"
    "(can be useful to obtain different results from random constructions)\n");
@@ -173,9 +178,11 @@ parse(int argc, const char* argv[])
 }
 
 
-#define BUILD_AND_EXECUTE_TASK(net_construction, point_set_type)\
+#define BUILD_TASK(net_construction, point_set_type)\
 NetBuilder::Parser::CommandLine<NetBuilder::NetConstruction::net_construction, NetBuilder::PointSetType::point_set_type> cmd;\
 \
+cmd.s_designParameter = designParameterString;\
+cmd.s_verbose = opt["verbose"].as<std::string>();\
 cmd.s_explorationMethod = opt["exploration-method"].as<std::string>();\
 cmd.s_size = opt["size"].as<std::string>();\
 cmd.s_dimension = opt["dimension"].as<std::string>();\
@@ -187,11 +194,7 @@ if (opt.count("combiner") < 1){\
 else{\
   cmd.s_combiner = opt["combiner"].as<std::string>();\
 }\
-auto task = cmd.parse();\
-t0 = high_resolution_clock::now();\
-task->execute();\
-t1 = high_resolution_clock::now();\
-TaskOutput(*task);
+task = cmd.parse();
 
 
 
@@ -206,9 +209,16 @@ int main(int argc, const char *argv[])
 
         auto opt = parse(argc, argv);
 
-        // bool quiet = opt.count("quiet");
-
         auto repeat = opt["repeat"].as<unsigned int>();
+
+        NetBuilder::OutputFormat outputFormat;
+        if (opt.count("GUI")) {
+          outputFormat = NetBuilder::OutputFormat::GUI;
+        }
+        else
+        {
+          outputFormat = NetBuilder::OutputFormat::CLI;
+        }
 
         // global variable
         merit_digits_displayed = opt["merit-digits-displayed"].as<unsigned int>();
@@ -216,29 +226,44 @@ int main(int argc, const char *argv[])
         std::string s_setType = opt["set-type"].as<std::string>();
         std::string s_construction = opt["construction"].as<std::string>();
         NetBuilder::PointSetType setType = NetBuilder::Parser::PointSetTypeParser::parse(s_setType);
-        NetBuilder::NetConstruction netConstruction = NetBuilder::Parser::NetConstructionParser::parse(s_construction);
 
-      std::chrono::time_point<std::chrono::high_resolution_clock> t0, t1;
+        auto netConstructionPair = NetBuilder::Parser::NetConstructionParser::parse(s_construction);
+
+        NetBuilder::NetConstruction netConstruction = netConstructionPair.first;
+
+        std::string designParameterString = netConstructionPair.second;
+
+        std::chrono::time_point<std::chrono::high_resolution_clock> t0, t1;
       
-      for (unsigned i=0; i<repeat; i++){
+        std::unique_ptr<NetBuilder::Task::BaseTask> task;
+
         if(netConstruction == NetBuilder::NetConstruction::SOBOL && setType == NetBuilder::PointSetType::UNILEVEL){
-          BUILD_AND_EXECUTE_TASK(SOBOL, UNILEVEL)
+          BUILD_TASK(SOBOL, UNILEVEL)
        }
        if(netConstruction == NetBuilder::NetConstruction::SOBOL && setType == NetBuilder::PointSetType::MULTILEVEL){
-          BUILD_AND_EXECUTE_TASK(SOBOL, MULTILEVEL)
+          BUILD_TASK(SOBOL, MULTILEVEL)
        }
-      //  if(netConstruction == NetBuilder::NetConstruction::POLYNOMIAL && setType == NetBuilder::PointSetType::UNILEVEL){
-      //     BUILD_AND_EXECUTE_TASK(POLYNOMIAL, UNILEVEL)
-      //  }
+       if(netConstruction == NetBuilder::NetConstruction::POLYNOMIAL && setType == NetBuilder::PointSetType::UNILEVEL){
+          BUILD_TASK(POLYNOMIAL, UNILEVEL)
+       }
       //  if(netConstruction == NetBuilder::NetConstruction::POLYNOMIAL && setType == NetBuilder::PointSetType::MULTILEVEL){
-      //     BUILD_AND_EXECUTE_TASK(POLYNOMIAL, MULTILEVEL)
+      //     BUILD_TASK(POLYNOMIAL, MULTILEVEL)
       //  }
-
-      //  if (not quiet) {
-          auto dt = duration_cast<duration<double>>(t1 - t0);
-         std::cout << std::endl;
-         std::cout << "ELAPSED CPU TIME: " << dt.count() << " seconds" << std::endl;
-      // }
+        if(netConstruction == NetBuilder::NetConstruction::EXPLICIT && setType == NetBuilder::PointSetType::UNILEVEL){
+          BUILD_TASK(EXPLICIT, UNILEVEL)
+       }
+      //  if(netConstruction == NetBuilder::NetConstruction::EXPLICIT && setType == NetBuilder::PointSetType::MULTILEVEL){
+      //     BUILD_TASK(EXPLICIT, MULTILEVEL)
+      //  }
+      for (unsigned i=0; i<repeat; i++){
+      t0 = high_resolution_clock::now();\
+      task->execute();\
+      t1 = high_resolution_clock::now();\
+      TaskOutput(*task, outputFormat);
+      auto dt = duration_cast<duration<double>>(t1 - t0);
+      std::cout << std::endl;
+      std::cout << "ELAPSED CPU TIME: " << dt.count() << " seconds" << std::endl;
+      task.reset();
       }
    }
    catch (LatBuilder::Parser::ParserError& e) {
@@ -253,5 +278,5 @@ int main(int argc, const char *argv[])
    return 0;
 }
 
-#undef BUILD_AND_EXECUTE_TASK
+#undef BUILD_TASK
 }

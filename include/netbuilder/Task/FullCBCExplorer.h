@@ -32,11 +32,13 @@ class FullCBCExplorer
     public:
 
 
-        FullCBCExplorer(unsigned int dimension):
+        FullCBCExplorer(unsigned int dimension, typename ConstructionMethod::DesignParameter designParameter, int verbose = 0):
             m_dimension(dimension),
+            m_designParameter(std::move(designParameter)),
             m_currentDim(1),
-            m_data(ConstructionMethod::genValueSpace(1)),
-            m_state(0)
+            m_data(ConstructionMethod::genValueSpaceDim(1, m_designParameter)),
+            m_state(0),
+            m_verbose(verbose)
         {};
 
         bool isOver(unsigned int dim) 
@@ -46,7 +48,7 @@ class FullCBCExplorer
                 if (m_currentDim < m_dimension)
                 {
                     ++m_currentDim;
-                    m_data = ConstructionMethod::genValueSpace(m_currentDim);
+                    m_data = ConstructionMethod::genValueSpaceDim(m_currentDim,  m_designParameter);
                     m_state = 0;
                 }
                 return true;
@@ -57,14 +59,33 @@ class FullCBCExplorer
         typename ConstructionMethod::GenValue nextGenValue(unsigned int dim)
         {
             m_state+=1;
+            if(this->m_verbose>0)
+            {
+                std::cout << "Dimension: " << dim << "/" << m_dimension <<  " - ";
+                std::cout << "net " << m_state << "/" << m_data.size() << std::endl;
+            }
             return m_data[m_state-1];
+        }
+
+        void reset()
+        {
+            m_currentDim = 1;
+            m_data = (ConstructionMethod::genValueSpaceDim(1));
+            m_state = 0;
+        }
+
+        void setVerbose(int verbose)
+        {
+            m_verbose = verbose;
         }
 
     private:
         unsigned int m_dimension;
+        typename ConstructionMethod::DesignParameter m_designParameter;
         unsigned int m_currentDim;
         std::vector<typename ConstructionMethod::GenValue> m_data;
         size_t m_state;
+        int m_verbose;
 };
 
 }}
